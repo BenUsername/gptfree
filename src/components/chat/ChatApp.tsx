@@ -227,6 +227,10 @@ export function ChatApp() {
     if (!trimmed || isStreaming) return;
 
     const tempAssistantId = crypto.randomUUID();
+    // The meta frame renames the placeholder, so track the live id: a
+    // mid-stream failure must still land on the message being streamed
+    // instead of vanishing.
+    let assistantId = tempAssistantId;
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -252,6 +256,7 @@ export function ChatApp() {
         // excluded.
         messages.filter((entry) => entry.content.trim().length > 0),
         (streamMeta) => {
+          assistantId = streamMeta.assistantMessageId;
           setActiveConversationId(streamMeta.conversationId);
           setMessages((current) =>
             current.map((message) =>
@@ -284,7 +289,7 @@ export function ChatApp() {
         error instanceof Error ? error.message : "Something went wrong";
       setMessages((current) =>
         current.map((entry) =>
-          entry.id === tempAssistantId ? { ...entry, content: message } : entry,
+          entry.id === assistantId ? { ...entry, content: message } : entry,
         ),
       );
     } finally {

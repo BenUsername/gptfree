@@ -24,15 +24,17 @@ function usageSalt(): string | null {
 /**
  * Derives a stable, non-reversible identifier for the caller. Raw IPs are
  * never returned or stored.
+ *
+ * Behind Vercel `x-forwarded-for` is always present. Without it (a direct
+ * connection, e.g. `npm run dev`) every caller shares a single bucket: still
+ * capped, never uncounted, so a missing header can only tighten the limit.
  */
 export function getClientIpHash(request: NextRequest): string | null {
   const forwardedFor = request.headers.get("x-forwarded-for");
   const ip =
     forwardedFor?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip")?.trim() ||
-    "";
-
-  if (!ip) return null;
+    "unknown";
 
   const salt = usageSalt();
   if (!salt) {
