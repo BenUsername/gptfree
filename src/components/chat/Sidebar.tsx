@@ -2,6 +2,7 @@
 
 import {
   LayoutGrid,
+  LogIn,
   LogOut,
   PanelLeft,
   PenLine,
@@ -121,6 +122,14 @@ export function Sidebar({
       ) : null}
 
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-2 gpt-scrollbar">
+        {!user ? (
+          <div className="px-3 pb-3 text-[12px] leading-4 text-[#676767]">
+            <a href="/login" className="underline hover:text-[#0d0d0d]">
+              Sign in
+            </a>{" "}
+            to save your chats
+          </div>
+        ) : null}
         <div className="px-3 pb-2 text-[12px] font-medium text-[#676767]">
           Recents
         </div>
@@ -155,24 +164,37 @@ export function Sidebar({
             <div className="truncate text-[14px] font-medium text-[#0d0d0d]">
               {displayName(user)}
             </div>
-            <div className="text-[12px] text-[#676767]">Plus</div>
+            <div className="text-[12px] text-[#676767]">
+              {user ? "Plus" : "Not signed in"}
+            </div>
           </div>
           <LayoutGrid className="h-4 w-4 shrink-0 text-[#676767]" strokeWidth={1.75} />
         </button>
 
         {menuOpen ? (
           <div className="absolute bottom-[calc(100%+4px)] left-3 right-3 rounded-xl border border-[#e5e5e5] bg-white p-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                void handleSignOut();
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[14px] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
-            >
-              <LogOut className="h-4 w-4 text-[#676767]" strokeWidth={1.75} />
-              Log out
-            </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  void handleSignOut();
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[14px] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+              >
+                <LogOut className="h-4 w-4 text-[#676767]" strokeWidth={1.75} />
+                Log out
+              </button>
+            ) : (
+              <a
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[14px] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+              >
+                <LogIn className="h-4 w-4 text-[#676767]" strokeWidth={1.75} />
+                Sign in
+              </a>
+            )}
           </div>
         ) : null}
       </div>

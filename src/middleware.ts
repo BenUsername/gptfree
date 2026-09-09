@@ -1,5 +1,4 @@
-import { authkitMiddleware, authkit } from "@workos-inc/authkit-nextjs";
-import { NextResponse } from "next/server";
+import { authkitMiddleware } from "@workos-inc/authkit-nextjs";
 import type { NextRequest, NextFetchEvent } from "next/server";
 
 const authkitMiddlewareHandler = authkitMiddleware();
@@ -10,6 +9,8 @@ export default async function middleware(
 ) {
   const { pathname } = request.nextUrl;
 
+  // AuthKit owns these paths (sign-in redirect, callback) and Next owns its own
+  // assets, so they must never pick up extra checks here.
   if (
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/login") ||
@@ -19,29 +20,9 @@ export default async function middleware(
     return authkitMiddlewareHandler(request, event);
   }
 
-  const isProtected = pathname === "/" || pathname.startsWith("/api/");
-
-  if (isProtected) {
-    try {
-      const { session } = await authkit(request);
-      if (!session?.user) {
-        if (pathname.startsWith("/api/")) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        const url = request.nextUrl.clone();
-        url.pathname = "/login";
-        return NextResponse.redirect(url);
-      }
-    } catch {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-  }
-
+  // Nothing is gated at the edge: the app is anonymous-first. Every API route
+  // guards itself with requireAuth (401) or opts into getOptionalAuth, so the
+  // middleware only hydrates the session for signed-in visitors.
   return authkitMiddlewareHandler(request, event);
 }
 

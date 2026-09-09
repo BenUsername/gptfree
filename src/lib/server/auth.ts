@@ -15,15 +15,20 @@ export interface AuthUser {
   hasCommercialConsent: boolean;
 }
 
-export async function requireAuth(
-  request: NextRequest,
-): Promise<AuthUser | NextResponse> {
+type ResolvedAuth =
+  | { ok: true; user: AuthUser }
+  | { ok: false; reason: "unauthenticated" | "profile_sync_failed" };
+
+/**
+ * Resolves the AuthKit session into a gptfree_users row. Shared by requireAuth
+ * (which turns failures into HTTP responses) and getOptionalAuth (which turns
+ * them into null).
+ */
+async function resolveAuth(request: NextRequest): Promise<ResolvedAuth> {
   try {
     const { session } = await authkit(request);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Authentication required" }, {
-        status: 401,
-      });
+      return { ok: false, reason: "unauthenticated" };
     }
 
     const {
@@ -63,25 +68,54 @@ export async function requireAuth(
 
     if (error || !user) {
       console.error("[gptfree auth] Failed to upsert user:", error?.message);
-      return NextResponse.json({ error: "Failed to sync user profile" }, {
-        status: 500,
-      });
+      return { ok: false, reason: "profile_sync_failed" };
     }
 
     return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      workosUserId: user.workos_user_id,
-      hasCommercialConsent: Boolean(user.commercial_consent_at),
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        workosUserId: user.workos_user_id,
+        hasCommercialConsent: Boolean(user.commercial_consent_at),
+      },
     };
   } catch {
-    return NextResponse.json({ error: "Authentication required" }, {
-      status: 401,
+    return { ok: false, reason: "unauthenticated" };
+  }
+}
+
+export async function requireAuth(
+  request: NextRequest,
+): Promise<AuthUser | NextResponse> {
+  const resolved = await resolveAuth(request);
+
+  if (resolved.ok) return resolved.user;
+
+  if (resolved.reason === "profile_sync_failed") {
+    return NextResponse.json({ error: "Failed to sync user profile" }, {
+      status: 500,
     });
   }
+
+  return NextResponse.json({ error: "Authentication required" }, {
+    status: 401,
+  });
+}
+
+/**
+ * Like requireAuth, but every failure path (no session, no email, upsert
+ * error, thrown exception) yields null so the caller can serve anonymous
+ * visitors instead of rejecting them.
+ */
+export async function getOptionalAuth(
+  request: NextRequest,
+): Promise<AuthUser | null> {
+  const resolved = await resolveAuth(request);
+  return resolved.ok ? resolved.user : null;
 }
 
 export async function recordVisit(

@@ -29,13 +29,14 @@ async function streamChatResponse(
   conversationId: string | null,
   message: string,
   model: string,
+  history: ChatMessage[],
   onMeta: (meta: StreamMeta) => void,
   onDelta: (assistantMessageId: string, text: string) => void,
 ): Promise<StreamMeta> {
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId, message, model }),
+    body: JSON.stringify({ conversationId, message, model, history }),
   });
 
   if (!response.ok) {
@@ -246,6 +247,10 @@ export function ChatApp() {
         activeConversationId,
         trimmed,
         model,
+        // Anonymous requests have no server-side transcript, so the local
+        // messages are the conversation. The empty assistant placeholder is
+        // excluded.
+        messages.filter((entry) => entry.content.trim().length > 0),
         (streamMeta) => {
           setActiveConversationId(streamMeta.conversationId);
           setMessages((current) =>
@@ -268,7 +273,12 @@ export function ChatApp() {
       );
 
       setActiveConversationId(meta.conversationId);
-      await refreshConversations();
+
+      // Only signed-in visitors have saved conversations; /api/conversations
+      // 401s otherwise, and the throw would overwrite the streamed reply.
+      if (user) {
+        await refreshConversations();
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Something went wrong";
@@ -284,8 +294,10 @@ export function ChatApp() {
     activeConversationId,
     input,
     isStreaming,
+    messages,
     model,
     refreshConversations,
+    user,
   ]);
 
   const handleAcceptConsent = useCallback(async () => {
